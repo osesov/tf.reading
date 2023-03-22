@@ -4,17 +4,19 @@ export interface ProgressBarProps
 {
     bgcolor: string
     completed: number
+    visible?: boolean
 }
 
 const ProgressBar = (props: ProgressBarProps) => {
-    const { bgcolor, completed } = props;
+    const { bgcolor, completed, visible } = props;
 
     const containerStyles = {
         height: 20,
-        width: "100%",
+        width: "90%",
         backgroundColor: "#e0e0de",
         borderRadius: 50,
-        margin: 50,
+        margin: "0.5lh",
+        ... visible ? {} : { display: "none" }
     };
 
     const fillerStyles = {
@@ -24,7 +26,7 @@ const ProgressBar = (props: ProgressBarProps) => {
         borderRadius: "inherit",
         textAlign: "right",
         // animation
-        transition: 'width 1s ease-in-out',
+        transition: 'width 0.5s ease-in-out',
     };
 
     const labelStyles = {

@@ -86,3 +86,61 @@ clear {
   font-size: 5em;
   text-align: center;
 }
+
+#app {
+  display: flex;
+  width: 100%;
+  bottom: 0.5em solid red;
+  justify-content: center;
+
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+
+.layout-horizontal {
+  display: flex;
+  flex-direction: row;
+}
+
+
+.layout-vertical {
+  display: flex;
+  flex-direction: column;
+}
+
+.layout-wrap {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.layout-vertical-center {
+  display: flex;
+  align-items: center;
+}
+
+.layout-horizontal-center {
+  display: flex;
+  justify-content: center;
+  column-gap: 1em;
+}
+
+.layout-horizontal-space-between {
+  display: flex;
+  justify-content: space-between;
+}
+
+.status-bar {
+  display: flex;
+  height: 2lh;
+  max-width: 100%;
+  background-color: #f9f9fb;
+  border: 1px solid #cdcdcd;
+  border-radius: 5px;
+  margin-top: 10px;
+  align-items: center;
+  display: flex;
+  flex-grow: 1;
+  padding: 0em 1em;
+}

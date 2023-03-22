@@ -23,7 +23,8 @@ interface AIEventMap
     predict: {
         index: number,
         confidence: number
-    }
+    },
+    predicting: {}
 }
 
 export class AI extends EventEmitterImpl<AIEventMap>
@@ -31,7 +32,7 @@ export class AI extends EventEmitterImpl<AIEventMap>
     private webcam_: HTMLVideoElement | undefined;
     private videoPlaying_ = false;
     private videoGathering = false;
-    private trained = false;
+    private trained_ = false;
     private predict = false;
     private model_ ?: tf.Sequential;
     private cardDataSet : CardDataSet
@@ -50,10 +51,10 @@ export class AI extends EventEmitterImpl<AIEventMap>
         cardDataSet.ready
         .then(() => cardDataSet.loadModel())
         .then((model) => {
-            this.trained = true;
-            this.model_ = model as tf.Sequential;
+            this.trained_ = true;
+            this.compileAndSetModel(model as tf.Sequential);
         }).catch( (reason: any) => {
-            this.trained = false;
+            this.trained_ = false;
             console.warn("Model is not loaded: ", reason);
         })
     }
@@ -113,18 +114,11 @@ export class AI extends EventEmitterImpl<AIEventMap>
         });
     }
 
-    private get model(): tf.Sequential
+    private compileAndSetModel(model: tf.Sequential)
     {
-        if (this.model_)
-            return this.model_;
+        model.summary();
 
         const numberOfClasses = this.numberOfClasses;
-
-        let model = tf.sequential();
-        model.add(tf.layers.dense({ inputShape: [1024], units: 128, activation: "relu" }));
-        model.add(tf.layers.dense({ units: numberOfClasses, activation: "softmax" }));
-
-        model.summary();
 
         // Compile the model with the defined optimizer and specify a loss function to use.
         model.compile({
@@ -138,6 +132,20 @@ export class AI extends EventEmitterImpl<AIEventMap>
         });
 
         this.model_ = model;
+    }
+
+    private get model(): tf.Sequential
+    {
+        if (this.model_)
+            return this.model_;
+
+        const numberOfClasses = this.numberOfClasses;
+
+        let model = tf.sequential();
+        model.add(tf.layers.dense({ inputShape: [1024], units: 128, activation: "relu" }));
+        model.add(tf.layers.dense({ units: numberOfClasses, activation: "softmax" }));
+
+        this.compileAndSetModel(model);
         return model;
     }
 
@@ -145,7 +153,7 @@ export class AI extends EventEmitterImpl<AIEventMap>
     {
         // recreate model on demand
         this.model_ = undefined;
-        this.trained = false;
+        this.trained_ = false;
     }
 
     public get numberOfClasses(): number
@@ -235,6 +243,8 @@ export class AI extends EventEmitterImpl<AIEventMap>
             return;
         }
 
+        this.dispatchEvent('predicting', {})
+
         tf.tidy(() => {
             let videoFrameAsTensor = tf.browser.fromPixels(this.webcam).div<Tensor3D>(255);
             let resizedTensorFrame = tf.image.resizeBilinear(videoFrameAsTensor, [MOBILE_NET_INPUT_HEIGHT, MOBILE_NET_INPUT_WIDTH], true);
@@ -253,12 +263,12 @@ export class AI extends EventEmitterImpl<AIEventMap>
         window.requestAnimationFrame(() => this.predictLoop());
     }
 
-    private async train(status: (status: string) => void)
+    private async train(progress: (fraction: number) => void)
     {
-        if (this.trained)
+        if (this.trained_)
             return;
 
-        this.trained = false;
+        this.trained_ = false;
         const trainingDataInputs : tf.Tensor[] = [];
         const trainingDataOutputs: number[] = [];
         const numberOfClasses = this.numberOfClasses;
@@ -277,7 +287,8 @@ export class AI extends EventEmitterImpl<AIEventMap>
         let oneHotOutputs = tf.oneHot(outputsAsTensor, numberOfClasses);
         let inputsAsTensor = tf.stack(trainingDataInputs);
 
-        status('Идет обучение сети');
+        progress(0);
+        // status('Идет обучение сети');
         const epochs = 10;
 
         let results = await this.model.fit(inputsAsTensor, oneHotOutputs, {
@@ -286,7 +297,8 @@ export class AI extends EventEmitterImpl<AIEventMap>
             epochs: epochs,
             callbacks: {
                 onEpochEnd: function(epoch, logs) {
-                    status(`Обучение ${100 * epoch / epochs} %`)
+                    progress((epoch + 1) / epochs);
+                    // status(`Обучение ${100 * epoch / epochs} %`)
                     console.log("Data for epoch " + epoch, logs);
                 }
             }
@@ -294,17 +306,17 @@ export class AI extends EventEmitterImpl<AIEventMap>
         outputsAsTensor.dispose();
         oneHotOutputs.dispose();
         inputsAsTensor.dispose();
-        this.trained = true;
+        this.trained_ = true;
 
         await this.cardDataSet.saveModel(this.model);
     }
 
-    public async trainAndPredict(status: (status: string) => void) {
+    public async trainAndPredict(progress: (fraction: number) => void) {
         this.predict = false;
-        await this.train(status);
+        await this.train(progress);
 
         this.predict = true;
-        status('Распознавание');
+        // status('Распознавание');
         this.predictLoop();
     }
 
@@ -323,12 +335,17 @@ export class AI extends EventEmitterImpl<AIEventMap>
         const URL = "https://tfhub.dev/google/tfjs-model/imagenet/mobilenet_v3_small_100_224/feature_vector/5/default/1";
 
         this.mobilenet_ = await tf.loadGraphModel(URL, { fromTFHub: true });
-        updateStatus("MobileNet v3 loaded successfully!");
+        updateStatus("Данные MobileNet v3 загружены!");
 
         // Warm up the model by passing zeros through it once.
         tf.tidy(() => {
             let answer = asTensor(this.mobilenet.predict(tf.zeros([1, MOBILE_NET_INPUT_HEIGHT, MOBILE_NET_INPUT_WIDTH, 3])));
             console.log(answer.shape);
         });
+    }
+
+    public get trained()
+    {
+        return this.trained_;
     }
 }

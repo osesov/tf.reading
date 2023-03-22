@@ -56,18 +56,18 @@ export class Game extends Component<GameProps, GameState>
     }
 
     componentDidUpdate(previousProps: Readonly<Readonly<Attributes & { show: boolean; onClose: () => void; }>>, previousState: Readonly<GameState>, snapshot: any): void {
-        console.log("UPDATE EVENT LISTENER: now %s, prev: %s", this.props.show, previousProps.show)
+        // console.log("UPDATE EVENT LISTENER: now %s, prev: %s", this.props.show, previousProps.show)
         this.updateState(previousProps);
     }
 
     componentDidMount(): void {
-        console.log("ADD EVENT LISTENER", this.props.show);
+        // console.log("ADD EVENT LISTENER", this.props.show);
         this.updateState({ show: false })
         this.dialogRef.current!.addEventListener("close", this.closeListener )
     }
 
     componentWillUnmount(): void {
-        console.log("REMOVE EVENT LISTENER", this.props.show);
+        // console.log("REMOVE EVENT LISTENER", this.props.show);
         this.dialogRef.current!.removeEventListener("close", this.closeListener)
         this.dialogRef.current!.close();
     }
@@ -86,8 +86,8 @@ export class Game extends Component<GameProps, GameState>
         }
         else {
             const value = this.filter.update(confidence);
-            if (value > 0.99)
-                console.log("PREDICT %s %s", index, confidence, value);
+            // if (value > 0.99)
+                // console.log("PREDICT %s %s", index, confidence, value);
         }
 
         this.setState({
@@ -113,7 +113,7 @@ export class Game extends Component<GameProps, GameState>
         // if (!props?.show)
             // return null;
 
-        console.log("PROPS: ", this.props);
+        // console.log("PROPS: ", this.props);
         if (this.currentKey === undefined && props?.show) {
             this.selectCardKey();
         }

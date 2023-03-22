@@ -295,7 +295,7 @@ export class CardDataSetImpl extends EventEmitterImpl<CardEventMap> implements C
         if (maxIndex === 0)
             throw new Error("Empty set");
 
-        const selectedIndex = Math.floor(Math.random() * maxIndex)
+        const selectedIndex = 1 + Math.floor(Math.random() * (maxIndex - 1))
         const keys = this.data_.keys();
 
         for (let it = 0, k = keys.next(); !k.done; k = keys.next(), it++) {

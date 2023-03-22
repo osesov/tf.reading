@@ -16,12 +16,14 @@ import { AI, hasGetUserMedia } from "./ai";
 import { ai, cardDataSet } from "./helpers/AIContext";
 import { CardData, CardKey } from "./helpers/cards";
 import { Game } from "./game";
+import ProgressBar from "./components/ProgressBar";
+import { delay } from "./helpers/util";
 
 async function seedDatabase()
 {
     const data = [
         // "январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"
-        "Телефон", "Пульт"
+        "Фон", "Телефон", "Пульт"
     ]
 
     await cardDataSet.clear();
@@ -85,11 +87,11 @@ const App = () => {
     const editCardsRef = createRef();
     const camRef = createRef();
     const [camPlaying, setCamPlaying] = useState(ai.webcamPlaying);
-
     const [status, setStatus] = useState("");
     const [cardListVisible, setCardListState] = useState(false);
-    // const [camButtonState, setCamButtonState] = useState(ai.webcamPlaying);
     const [gamePlaying, setGamePlaying] = useState(false);
+    const [progress, setProgress] = useState(0);
+    const [training, setTraining] = useState(false);
 
     ai.loadMobileNetFeatureModel(setStatus);
 
@@ -124,15 +126,23 @@ const App = () => {
         return ai.webcamPlaying ? { className: 'hidden'} : {};
     }
 
+    function visibleIfNotPlaying()
+    {
+        if (gamePlaying)
+            return { className: 'hidden' }
+
+        return {}
+    }
+
     useEffect(() => {
         // DidMount
-        console.log("Mounted", editCardsRef.current)
+        // console.log("Mounted", editCardsRef.current)
         ai.attach(camRef.current)
         ai.once('playing', () => setCamPlaying(ai.webcamPlaying))
 
         // WillUnmount
         return () => {
-            console.log("Unmounted", editCardsRef.current)
+            // console.log("Unmounted", editCardsRef.current)
             ai.attach(camRef.current);
         }
     })
@@ -143,9 +153,20 @@ const App = () => {
         // setGamePlaying(true);
         // return ;
 
+        setTraining(true);
+
+        const preTrained = ai.trained;
+
         ai.enableCam()
-        .then(() => ai.trainAndPredict(setStatus))
-        .then( () => setGamePlaying(true))
+        .then(() =>
+            ai.trainAndPredict((f) => setProgress(f*100)))
+        .then(() =>
+            setTraining(false))
+        .then(() =>
+            preTrained ? null : delay(2))
+        .then(() =>
+            setGamePlaying(true)
+            )
         ;
     }
 
@@ -157,7 +178,7 @@ const App = () => {
 
     function clearData()
     {
-        if (window.confirm("Точно сбрасываем данные?"))
+        if (window.confirm("Точно удаляем данные?"))
             cardDataSet.clear();
     }
 
@@ -172,19 +193,26 @@ const App = () => {
     }
 
     return (
-        <div>
-            <h1>Обучение чтению</h1>
-            <video ref={camRef} autoPlay muted></video>
+        <div id="app" class="app">
+            <div class="layout-vertical">
+                <h1>Обучение чтению</h1>
+                <video ref={camRef} autoPlay muted></video>
+                <div class="layout-horizontal layout-horizontal-center">
 
-            <ShowCardList ref={editCardsRef} show={cardListVisible} onClose={() => closeCardList() } />
-            <Game show={gamePlaying} onClose={() => endGame()}/>
-            <button onClick={ () => enableCam()} {... enableCamProps()}>Включить Камеру</button>
-            <button onClick={ () => showCardList() }>Карточки</button>
-            <button onClick={ () => clearData() }>Сброс данных</button>
-            <button onClick={ () => beginGame() }>Поехали!</button>
-            <button onClick={ () => seedData() }>Добавить карточки из набора</button>
+                    <ShowCardList ref={editCardsRef} show={cardListVisible} onClose={() => closeCardList() } />
+                    <Game show={gamePlaying} onClose={() => endGame()}/>
+                    <button {...visibleIfNotPlaying()} onClick={ () => enableCam()} {... enableCamProps()}>Включить Камеру</button>
+                    <button {...visibleIfNotPlaying()} onClick={ () => showCardList() }>Карточки</button>
+                    <button {...visibleIfNotPlaying()} onClick={ () => clearData() }>Сброс данных</button>
+                    <button {...visibleIfNotPlaying()} onClick={ () => beginGame() }>Поехали!</button>
+                    <button {...visibleIfNotPlaying()} onClick={ () => seedData() }>Добавить карточки из набора</button>
 
-            <div>{status}</div>
+                </div>
+                <div class="layout-horizontal-center">
+                    <ProgressBar bgcolor={"#6a1b9a"} completed={progress} visible={training} />
+                </div>
+                <div class="status-bar">{status}</div>
+            </div>
         </div>
     );
 };

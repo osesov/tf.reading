@@ -14,4 +14,5 @@ https://habr.com/ru/company/binarydistrict/blog/428255/
 
 - show/hide modal `<div>`: https://blog.bitsrc.io/build-a-simple-modal-component-with-react-16decdc111a6
 - progress bar: https://dev.to/ramonak/react-how-to-create-a-custom-progress-bar-component-in-5-minutes-2lcl
+- flex: https://css-tricks.com/snippets/css/a-guide-to-flexbox/
 -
