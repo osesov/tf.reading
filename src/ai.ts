@@ -1,5 +1,6 @@
 import tf, { Tensor3D } from "@tensorflow/tfjs";
 import { CardDataSet, CardKey } from "./helpers/cards";
+import { EventEmitterImpl } from "./helpers/EventEmitter";
 import { DataObject } from "./helpers/Types";
 
 const MOBILE_NET_INPUT_WIDTH = 224;
@@ -16,87 +17,16 @@ function asTensor(tensor: tf.Tensor | tf.Tensor[] | tf.NamedTensorMap): tf.Tenso
     throw new Error("Single tensor expected");
 }
 
-export type EventListener<E> = (event: E) => void;
-
-class EventEmitterImpl<E>
+interface AIEventMap
 {
-    private listeners: {
-        [k: string]: { id: number, listener: EventListener<E>}[]
-    } = {};
-
-    private id: number = 0;
-
-    private unsubscribe(name: string, id: number)
-    {
-        if (!(name in this.listeners))
-            return;
-
-        const listeners = this.listeners[name];
-        const elem = listeners.findIndex((e) => e.id === id);
-        if (elem < 0)
-            return;
-
-        delete listeners[elem];
-    }
-
-    public on(name: string, listener: EventListener<E>)
-    {
-        if (! (name in this.listeners)) {
-            this.listeners[name] = []
-        }
-
-        const id = this.id++;
-        this.listeners[name].push({ id: id, listener: (e) => listener(e) });
-
-        return {
-            unsubscribe: () => this.unsubscribe(name, id)
-        }
-    }
-
-    public once(name: string, listener: EventListener<E>)
-    {
-        if (! (name in this.listeners)) {
-            this.listeners[name] = []
-        }
-
-        const id = this.id++;
-        this.listeners[name].push({
-            id: id,
-            listener: (e) => {
-                try {
-                    listener(e);
-                }
-                finally {
-                    this.unsubscribe(name, id);
-                }
-            }});
-
-        return {
-            unsubscribe: () => this.unsubscribe(name, id)
-        }
-
-    }
-
-    public dispatch(name: string, event: E)
-    {
-        const listeners = this.listeners[name];
-
-        if (!listeners)
-            return;
-
-        listeners.forEach(element => {
-            try {
-                element.listener(event);
-            }
-
-            catch(e: any) {
-                console.warn("Exception raised in handling %s", name, { exception: e, event: event})
-            }
-        });
+    playing: {}
+    predict: {
+        index: number,
+        confidence: number
     }
 }
 
-export class AI extends EventEmitterImpl<DataObject>
+export class AI extends EventEmitterImpl<AIEventMap>
 {
     private webcam_: HTMLVideoElement | undefined;
     private videoPlaying_ = false;
@@ -104,7 +34,6 @@ export class AI extends EventEmitterImpl<DataObject>
     private trained = false;
     private predict = false;
     private model_ ?: tf.Sequential;
-    // private elements: AIElement[] = [];
     private cardDataSet : CardDataSet
     private mobilenet_: tf.GraphModel | undefined;
 
@@ -113,10 +42,20 @@ export class AI extends EventEmitterImpl<DataObject>
         super();
         this.cardDataSet = cardDataSet;
 
-        cardDataSet.addEventListener( 'reset', () => this.datasetChanged() )
-        cardDataSet.addEventListener( 'addCard', () => this.datasetChanged() )
-        cardDataSet.addEventListener( 'changeCard', () => this.datasetChanged() )
-        cardDataSet.addEventListener( 'deleteCard', () => this.datasetChanged() )
+        cardDataSet.on( 'reset', () => this.datasetChanged() )
+        cardDataSet.on( 'addCard', () => this.datasetChanged() )
+        cardDataSet.on( 'changeCard', () => this.datasetChanged() )
+        cardDataSet.on( 'deleteCard', () => this.datasetChanged() )
+
+        cardDataSet.ready
+        .then(() => cardDataSet.loadModel())
+        .then((model) => {
+            this.trained = true;
+            this.model_ = model as tf.Sequential;
+        }).catch( (reason: any) => {
+            this.trained = false;
+            console.warn("Model is not loaded: ", reason);
+        })
     }
 
     public attach(webcam ?: HTMLVideoElement)
@@ -133,34 +72,45 @@ export class AI extends EventEmitterImpl<DataObject>
         return this.webcam_;
     }
 
-    public get webcamEnabled(): boolean
+    public get webcamPlaying(): boolean
     {
         return this.videoPlaying;
     }
 
-    public enableCam() {
-        if (this.videoPlaying)
-            return;
+    protected haveSubscriber<K extends keyof AIEventMap>(name: K)
+    {
+        if (name === 'playing' && this.webcamPlaying)
+            this.dispatchEvent('playing', {})
+    }
 
-        if (hasGetUserMedia()) {
-            this.webcam;
+    public async enableCam() {
+        return new Promise<void>((resolve) => {
+            if (this.videoPlaying)
+                return resolve();
 
-            const constraints = {
-                video: true,
-                width: 640,
-                height: 480,
-            };
+            if (hasGetUserMedia()) {
+                this.webcam;
 
-            // Activate the webcam stream.
-            navigator.mediaDevices.getUserMedia(constraints).then((stream) => {
-                this.webcam.srcObject = stream;
-                this.webcam.addEventListener("loadeddata", () => {
-                    this.videoPlaying = true;
+                const constraints = {
+                    video: true,
+                    width: 640,
+                    height: 480,
+                };
+
+                // Activate the webcam stream.
+                navigator.mediaDevices.getUserMedia(constraints).then((stream) => {
+                    this.webcam.srcObject = stream;
+                    this.webcam.addEventListener("loadeddata", () => {
+                        this.videoPlaying = true;
+                        this.dispatchEvent("playing", {});
+                        resolve();
+                    });
                 });
-            });
-        } else {
-            alert("getUserMedia() is not supported by your browser");
-        }
+            } else {
+                alert("getUserMedia() is not supported by your browser");
+                return Promise.reject("getUserMedia() is not supported by your browser");
+            }
+        });
     }
 
     private get model(): tf.Sequential
@@ -294,25 +244,27 @@ export class AI extends EventEmitterImpl<DataObject>
             let highestIndex = prediction.argMax().arraySync() as number;
             let predictionArray = prediction.arraySync() as number[];
 
-            this.dispatch('predict', {
-                target: this,
+            this.dispatchEvent('predict', {
                 index: highestIndex,
-                confidence: Math.floor(predictionArray[highestIndex] * 100)
+                confidence: predictionArray[highestIndex]
             });
         });
 
         window.requestAnimationFrame(() => this.predictLoop());
     }
 
-    public async trainAndPredict(status: (status: string) => void) {
-        this.predict = false;
+    private async train(status: (status: string) => void)
+    {
+        if (this.trained)
+            return;
 
+        this.trained = false;
         const trainingDataInputs : tf.Tensor[] = [];
         const trainingDataOutputs: number[] = [];
         const numberOfClasses = this.numberOfClasses;
 
         this.cardDataSet.forEach( (key, card) => {
-            if (this.hasData(key)) {
+            if (!this.hasData(key)) {
                 throw Error(`Item [${key}] ${card.name} contains not enough data`);
             }
 
@@ -339,10 +291,18 @@ export class AI extends EventEmitterImpl<DataObject>
                 }
             }
         });
-
         outputsAsTensor.dispose();
         oneHotOutputs.dispose();
         inputsAsTensor.dispose();
+        this.trained = true;
+
+        await this.cardDataSet.saveModel(this.model);
+    }
+
+    public async trainAndPredict(status: (status: string) => void) {
+        this.predict = false;
+        await this.train(status);
+
         this.predict = true;
         status('Распознавание');
         this.predictLoop();

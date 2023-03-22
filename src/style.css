@@ -8,7 +8,6 @@ h1 {
   color: #FF6F00;
 }
 
-
 video {
   clear: both;
   display: block;
@@ -56,8 +55,6 @@ clear {
   margin-right: 0.5em;
 }
 
-
-
 /* check mark in cards "circle-xmark"*/
 .mark {
   margin-left: 0.5em;
@@ -71,4 +68,21 @@ clear {
 .mark-no-data {
 
   color: red;
+}
+
+.hidden {
+  display: none;
+}
+
+
+.word {
+  clear: both;
+  display: block;
+  padding: 0.5em;
+  border: #000000 solid 1px;
+  background: white;
+  color: brown;
+
+  font-size: 5em;
+  text-align: center;
 }

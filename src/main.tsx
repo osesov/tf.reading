@@ -8,8 +8,6 @@ import { createRef, RefCallback, RefObject, render } from "preact";
 import { useCallback, useContext, useEffect, useState } from "preact/hooks";
 
 // https://www.npmjs.com/package/html-native-modal
-import "html-native-modal";
-import "html-native-modal/html-native-modal.css";
 import MyButton from "./components/MyButton";
 import MyDialog from "./components/MyDialog";
 import { DataObject } from "./helpers/Types";
@@ -17,17 +15,13 @@ import MyIcon from "./components/MyIcon";
 import { AI, hasGetUserMedia } from "./ai";
 import { ai, cardDataSet } from "./helpers/AIContext";
 import { CardData, CardKey } from "./helpers/cards";
-
-// let cards: AIElement[] = [
-//     { name: "Январь" },
-//     { name: "Февраль" },
-//     //  { name: "Март" }, { name: "Апрель" }, { name: "Май" }, { name: "Июнь" }, { name: "Июль" }
-// ];
+import { Game } from "./game";
 
 async function seedDatabase()
 {
     const data = [
-        "январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"
+        // "январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"
+        "Телефон", "Пульт"
     ]
 
     await cardDataSet.clear();
@@ -90,8 +84,12 @@ const ShowCardList = ({ show, onClose, ...props }: DataObject) => {
 const App = () => {
     const editCardsRef = createRef();
     const camRef = createRef();
+    const [camPlaying, setCamPlaying] = useState(ai.webcamPlaying);
+
     const [status, setStatus] = useState("");
     const [cardListVisible, setCardListState] = useState(false);
+    // const [camButtonState, setCamButtonState] = useState(ai.webcamPlaying);
+    const [gamePlaying, setGamePlaying] = useState(false);
 
     ai.loadMobileNetFeatureModel(setStatus);
 
@@ -101,24 +99,77 @@ const App = () => {
 
     function showCardList()
     {
-        ai.enableCam();
-        setCardListState(true);
-        editCardsRef.current.base.showModal();
+        const dialog = editCardsRef.current.base;
+
+        ai.enableCam()
+        .then(() => {
+            setCardListState(true);
+            dialog.showModal();
+        });
     }
 
     function closeCardList()
     {
+        const dialog = editCardsRef.current.base;
+
         setCardListState(false);
-        editCardsRef.current?.base?.close();
+        dialog?.close();
+    }
+
+    function enableCamProps()
+    {
+        if (ai.webcamPlaying != camPlaying)
+            setCamPlaying(ai.webcamPlaying);
+
+        return ai.webcamPlaying ? { className: 'hidden'} : {};
     }
 
     useEffect(() => {
         // DidMount
+        console.log("Mounted", editCardsRef.current)
         ai.attach(camRef.current)
+        ai.once('playing', () => setCamPlaying(ai.webcamPlaying))
 
         // WillUnmount
-        return () => ai.attach(camRef.current);
+        return () => {
+            console.log("Unmounted", editCardsRef.current)
+            ai.attach(camRef.current);
+        }
     })
+
+    function beginGame()
+    {
+        console.log("beginGame: %s", gamePlaying);
+        // setGamePlaying(true);
+        // return ;
+
+        ai.enableCam()
+        .then(() => ai.trainAndPredict(setStatus))
+        .then( () => setGamePlaying(true))
+        ;
+    }
+
+    function endGame()
+    {
+        console.log("endGame: %s", gamePlaying);
+        setGamePlaying(false);
+    }
+
+    function clearData()
+    {
+        if (window.confirm("Точно сбрасываем данные?"))
+            cardDataSet.clear();
+    }
+
+    function enableCam()
+    {
+        ai.enableCam().then( () => setStatus("Cam Enabled"));
+    }
+
+    function seedData()
+    {
+        seedDatabase().then( () => setStatus("Закончили!") );
+    }
 
     return (
         <div>
@@ -126,10 +177,12 @@ const App = () => {
             <video ref={camRef} autoPlay muted></video>
 
             <ShowCardList ref={editCardsRef} show={cardListVisible} onClose={() => closeCardList() } />
-            <button onClick={ () => ai.enableCam()}>Включить Камеру</button>
+            <Game show={gamePlaying} onClose={() => endGame()}/>
+            <button onClick={ () => enableCam()} {... enableCamProps()}>Включить Камеру</button>
             <button onClick={ () => showCardList() }>Карточки</button>
-            <button onClick={ () => cardDataSet.clear() }>Сброс данных</button>
-            <button onClick={ () => ai.trainAndPredict( setStatus) }>Поехали!</button>
+            <button onClick={ () => clearData() }>Сброс данных</button>
+            <button onClick={ () => beginGame() }>Поехали!</button>
+            <button onClick={ () => seedData() }>Добавить карточки из набора</button>
 
             <div>{status}</div>
         </div>

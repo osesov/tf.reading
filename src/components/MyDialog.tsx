@@ -1,5 +1,7 @@
 import { Component, ComponentChild, ComponentChildren, createRef, RefObject, RenderableProps } from "preact";
-import { useEffect } from "preact/hooks";
+
+import "html-native-modal";
+import "html-native-modal/html-native-modal.css";
 
 export type MyDialogOptions = RenderableProps<{
     open: boolean

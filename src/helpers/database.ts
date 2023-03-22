@@ -1,24 +1,33 @@
-import tf from '@tensorflow/tfjs';
-import { CardChangeEvent, CardData, CardDataSet, CardEventMap, CardEventTag, CardKey } from "./cards";
+import tf, { models } from '@tensorflow/tfjs';
+import { CardData, CardDataSet, CardEventMap, CardEventTag, CardKey } from "./cards";
+import { EventEmitterImpl } from './EventEmitter'
 
 const db_name = "learner";
 const db_version = 1;
 const db_card_store = "cards";
+
+const tf_model_store = 'indexeddb://card-model';
 
 interface CardMapItem {
     name: string
     trainingDataInputs: tf.Tensor[]
 }
 
-export class CardDataSetImpl implements CardDataSet {
+interface CardDBItem {
+    name: string,
+    trainingDataInputs: number[][]
+}
+
+export class CardDataSetImpl extends EventEmitterImpl<CardEventMap> implements CardDataSet
+{
     private ready_: Promise<void>;
     private db!: IDBDatabase;
     private data_ = new Map<CardKey, CardMapItem>
     private id_: number = 0;
 
-    private listeners: { [k: string]: ((event: any) => void)[] } = {}
-
     constructor() {
+        super();
+
         this.ready_ = new Promise((resolve, reject) => {
             const request = indexedDB.open(db_name, db_version);
 
@@ -49,6 +58,26 @@ export class CardDataSetImpl implements CardDataSet {
 
         transaction.oncomplete = resolve;
         transaction.onerror = reject;
+
+        this.id_ = 0;
+
+        const cursorRequest = store.openCursor();
+        cursorRequest.onerror = reject;
+        cursorRequest.onsuccess = () => {
+            const cursor = cursorRequest.result;
+            if (!cursor)
+                return;
+
+            const key = Number(cursor.key);
+            const value = this.mapObjectFromDB(cursor.value);
+            if (key >= this.id_)
+                this.id_ = key + 1;
+
+            this.data_.set(key, value);
+            cursor?.continue();
+        }
+
+        return;
 
         const allKeysRequest = store.getAllKeys();
         allKeysRequest.onerror = reject;
@@ -93,28 +122,40 @@ export class CardDataSetImpl implements CardDataSet {
         return this.data_.size;
     }
 
-    public keys(): string[] {
-        return Object.keys(this.data_);
+    public keys(): IterableIterator<CardKey> {
+        return this.data_.keys();
     }
 
-    public values(): readonly CardData[] {
-        return Object.values(this.data_);
+    public values(): IterableIterator<CardData> {
+        return this.data_.values();
     }
 
-    public entries(): ReadonlyArray<[string, CardData]> {
-        return Object.entries(this.data_);
+    public entries(): IterableIterator<[CardKey, CardData]> {
+        return this.data_.entries();
     }
 
-    private async mapObjectToDB(data: CardMapItem) {
-        const newObject = {
+    private async mapObjectToDB(data: CardMapItem): Promise<CardDBItem> {
+        const newObject: CardDBItem = {
             name: data.name,
-            trainingDataInputs: [] as any[]
+            trainingDataInputs: await Promise.all(data.trainingDataInputs.map(elem => elem.array() as Promise<number[]>))
         }
-
+        return newObject;
+/*
         for (let i = 0; i < data.trainingDataInputs.length; ++i) {
             const elem = await data.trainingDataInputs[i].array();
 
             newObject.trainingDataInputs.push(elem as any);
+        }
+
+        return newObject;
+*/
+    }
+
+    private mapObjectFromDB(data: CardDBItem): CardMapItem
+    {
+        const newObject : CardMapItem = {
+            name: data.name,
+            trainingDataInputs: data.trainingDataInputs.map( (elem: number[]) => tf.tensor1d(elem))
         }
 
         return newObject;
@@ -125,6 +166,8 @@ export class CardDataSetImpl implements CardDataSet {
         // return this.ready_;
 
         return this.ready_
+            .then(() => tf.io.listModels())
+            .then((models) => console.log(models))
             .then(() => new Promise<void>((resolve, reject) => {
                 const transaction = this.db.transaction(db_card_store, "readwrite");
                 const store = transaction.objectStore(db_card_store);
@@ -134,9 +177,10 @@ export class CardDataSetImpl implements CardDataSet {
                 clearRequest.onerror = reject;
                 clearRequest.onsuccess = () => resolve();
             }))
-            .then(() =>
-                this.dispatchEvent("reset", {})
-            );
+            .then(() => tf.io.removeModel(tf_model_store))
+            .catch((reason) => console.warn(reason))
+            .then(() => this.dispatchEvent("reset", {}))
+            ;
     }
 
     private async dbSaveCard(key: CardKey, value: CardMapItem, evname: CardEventTag)
@@ -209,27 +253,6 @@ export class CardDataSetImpl implements CardDataSet {
         return this.dbRemoveCard(key);
     }
 
-    public addEventListener(name: string, fn: (event: CardChangeEvent) => void): void {
-        if (!this.listeners[name])
-            this.listeners[name] = []
-        this.listeners[name].push();
-    }
-
-    private dispatchEvent<K extends CardEventTag>(name: CardEventTag, event: CardEventMap[K]) {
-        const listeners = this.listeners[name] || [];
-
-        listeners.forEach(e => {
-            try {
-                e(event)
-            }
-
-            catch (reason: any) {
-                console.log("Exception in " + name, reason);
-            }
-        })
-
-    }
-
     clear(): Promise<void>
     {
         this.data_.forEach( elem => {
@@ -238,6 +261,7 @@ export class CardDataSetImpl implements CardDataSet {
         })
 
         this.data_.clear();
+        this.id_ = 0;
         return this.dbClearData();
     }
 
@@ -256,7 +280,7 @@ export class CardDataSetImpl implements CardDataSet {
 
     public get nextId(): CardKey
     {
-        return ++this.id_;
+        return this.id_++;
     }
 
     public get empty(): boolean
@@ -264,4 +288,33 @@ export class CardDataSetImpl implements CardDataSet {
         return this.data_.size === 0;
     }
 
+    public getRandom(): CardKey
+    {
+        const maxIndex = this.data_.size;
+
+        if (maxIndex === 0)
+            throw new Error("Empty set");
+
+        const selectedIndex = Math.floor(Math.random() * maxIndex)
+        const keys = this.data_.keys();
+
+        for (let it = 0, k = keys.next(); !k.done; k = keys.next(), it++) {
+            if (it === selectedIndex)
+                return k.value;
+        }
+
+        throw new Error(`Invalid index: ${selectedIndex}/${maxIndex}`);
+    }
+
+    public async loadModel(): Promise<tf.LayersModel>
+    {
+        await this.ready;
+        return tf.loadLayersModel(tf_model_store);
+    }
+
+    public async saveModel(model: tf.LayersModel)
+    {
+        await this.ready;
+        await model.save(tf_model_store);
+    }
 }

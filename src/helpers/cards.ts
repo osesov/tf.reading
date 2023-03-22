@@ -1,5 +1,6 @@
 
 import tf from '@tensorflow/tfjs'
+import { EventEmitter } from './EventEmitter';
 
 export type CardKey = number;
 export interface CardData
@@ -23,13 +24,16 @@ export interface CardEventMap
 
 export type CardEventTag = keyof CardEventMap;
 
-export interface CardDataSet
+export interface CardDataSet extends EventEmitter<CardEventMap>
 {
     readonly length: number;
+    readonly nextId: number;
+    readonly empty: boolean;
+    readonly ready: Promise<void>
 
-    keys(): readonly string[];
-    values(): readonly CardData[];
-    entries(): readonly [string, CardData][]
+    keys(): IterableIterator<CardKey>;
+    values(): IterableIterator<CardData>;
+    entries(): IterableIterator<[CardKey, CardData]>;
 
     addCard(key: CardKey, name: string): void
     setTrainingInputs(key: CardKey, data: readonly tf.Tensor[]): void;
@@ -37,10 +41,13 @@ export interface CardDataSet
     getCard(key: CardKey): CardData | null
     removeCard(key: CardKey): void
 
-    addEventListener<K extends keyof CardEventMap>(name: K, fn: (event: CardEventMap[K]) => void) : void
-
     clear(): void
 
     forEach(cb: (key: CardKey, value: CardData) => void): void
     map<T>(cb: (key: CardKey, value: CardData) => T): T[]
+
+    getRandom(): CardKey;
+
+    saveModel(model: tf.LayersModel): Promise<void>
+    loadModel(): Promise<tf.LayersModel>
 }
