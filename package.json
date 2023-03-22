@@ -1,0 +1,39 @@
+{
+  "name": "tf.learner",
+  "version": "1.0.0",
+  "description": "",
+  "main": "script.js",
+  "scripts": {
+    "build": "rollup -c browser.rollup.config.js",
+    "serve": "rollup -c browser.rollup.config.js --serve 8888",
+    "http": "cd index && http-server-with-headers"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^6.3.0",
+    "@fortawesome/free-brands-svg-icons": "^6.3.0",
+    "@fortawesome/free-regular-svg-icons": "^6.3.0",
+    "@fortawesome/free-solid-svg-icons": "^6.3.0",
+    "@tensorflow/tfjs": "^4.2.0",
+    "@tensorflow/tfjs-backend-wasm": "^4.2.0",
+    "dotenv": "^16.0.3",
+    "html-native-modal": "^0.3.0",
+    "parse-duration": "^1.0.3",
+    "preact": "=10.13.1"
+  },
+  "type": "module",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^24.0.1",
+    "@rollup/plugin-node-resolve": "^15.0.1",
+    "@rollup/plugin-typescript": "^11.0.0",
+    "@tensorflow/tfjs-node": "^4.2.0",
+    "@types/jquery": "^3.5.16",
+    "@types/node": "^18.15.0",
+    "rollup": "^3.19.1",
+    "rollup-plugin-import-css": "^3.2.1",
+    "rollup-plugin-livereload": "^2.0.5",
+    "rollup-plugin-serve": "^2.0.2",
+    "tsx": "^3.12.5"
+  }
+}

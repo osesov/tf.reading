@@ -1,0 +1,74 @@
+body {
+  font-family: helvetica, arial, sans-serif;
+  margin: 2em;
+}
+
+h1 {
+  font-style: italic;
+  color: #FF6F00;
+}
+
+
+video {
+  clear: both;
+  display: block;
+  margin: 10px;
+  background: #000000;
+  width: 640px;
+  height: 480px;
+}
+
+video {
+  transform: scale(-1,1);
+}
+
+video::-webkit-media-controls-panel {
+  transform: scale(-1,1);
+}
+
+button {
+  padding: 10px;
+}
+
+.removed {
+  display: none;
+}
+
+#status {
+  font-size:150%;
+}
+
+clear {
+  clear: both  !important
+}
+
+[data-modal] {
+  padding: 16px !important;
+  border: 3px !important;
+  border-radius: 10px;
+}
+
+.card-edit {
+  width: 100%;
+}
+
+.space-after {
+  margin-right: 0.5em;
+}
+
+
+
+/* check mark in cards "circle-xmark"*/
+.mark {
+  margin-left: 0.5em;
+  margin-right: 0.5em;
+}
+
+.mark-has-data {
+  color: green;
+}
+
+.mark-no-data {
+
+  color: red;
+}

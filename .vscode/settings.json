@@ -1,0 +1,16 @@
+{
+    "files.autoSave": "onWindowChange",
+    "files.associations": {
+        "*tsconfig.json": "jsonc"
+    },
+
+    "liveServer.settings.mount": [[ "/", "./index" ]],
+    "liveServer.settings.CustomBrowser": "chrome",
+    "liveServer.settings.ChromeDebuggingAttachment": true,
+    "liveServer.settings.AdvanceCustomBrowserCmdLine": "chromium --remote-debugging-port=9222 --disable-web-security --user-data-dir=\"/home/osesov/tmp/chromium-nocors\"",
+
+    "prettier.tabWidth": 4,
+
+    "debug.console.closeOnEnd": false,
+    "debug.console.acceptSuggestionOnEnter": "on"
+}
