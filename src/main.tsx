@@ -12,12 +12,12 @@ import MyButton from "./components/MyButton";
 import MyDialog from "./components/MyDialog";
 import { DataObject } from "./helpers/Types";
 import MyIcon from "./components/MyIcon";
-import { AI, hasGetUserMedia } from "./ai";
 import { ai, cardDataSet } from "./helpers/AIContext";
 import { CardData, CardKey } from "./helpers/cards";
-import { Game } from "./game";
 import ProgressBar from "./components/ProgressBar";
-import { delay } from "./helpers/util";
+import { delay, hasGetUserMedia } from "./helpers/util";
+import Game from "./components/Game";
+import "./style.css"
 
 async function seedDatabase()
 {
@@ -95,10 +95,6 @@ const App = () => {
 
     ai.loadMobileNetFeatureModel(setStatus);
 
-    // const webcamRef: RefCallback<HTMLVideoElement> = useCallback((x: HTMLVideoElement | null) => {
-    //     if (x) ai.attach(x);
-    // }, []);
-
     function showCardList()
     {
         const dialog = editCardsRef.current.base;
@@ -150,11 +146,8 @@ const App = () => {
     function beginGame()
     {
         console.log("beginGame: %s", gamePlaying);
-        // setGamePlaying(true);
-        // return ;
 
         setTraining(true);
-
         const preTrained = ai.trained;
 
         ai.enableCam()
@@ -194,19 +187,17 @@ const App = () => {
 
     return (
         <div id="app" class="app">
-            <div class="layout-vertical">
-                <h1>Обучение чтению</h1>
+            <div class="layout-vertical position-relative">
+                <div class="title">Обучение чтению</div>
                 <video ref={camRef} autoPlay muted></video>
+                <Game show={gamePlaying} onClose={() => endGame()}/>
                 <div class="layout-horizontal layout-horizontal-center">
-
                     <ShowCardList ref={editCardsRef} show={cardListVisible} onClose={() => closeCardList() } />
-                    <Game show={gamePlaying} onClose={() => endGame()}/>
                     <button {...visibleIfNotPlaying()} onClick={ () => enableCam()} {... enableCamProps()}>Включить Камеру</button>
                     <button {...visibleIfNotPlaying()} onClick={ () => showCardList() }>Карточки</button>
                     <button {...visibleIfNotPlaying()} onClick={ () => clearData() }>Сброс данных</button>
                     <button {...visibleIfNotPlaying()} onClick={ () => beginGame() }>Поехали!</button>
                     <button {...visibleIfNotPlaying()} onClick={ () => seedData() }>Добавить карточки из набора</button>
-
                 </div>
                 <div class="layout-horizontal-center">
                     <ProgressBar bgcolor={"#6a1b9a"} completed={progress} visible={training} />

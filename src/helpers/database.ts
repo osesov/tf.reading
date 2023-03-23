@@ -161,6 +161,13 @@ export class CardDataSetImpl extends EventEmitterImpl<CardEventMap> implements C
         return newObject;
     }
 
+    public removeModel(): Promise<void>
+    {
+        return tf.io.removeModel(tf_model_store)
+        .catch((reason) => console.warn(reason))
+        .then(()=>{})
+    }
+
     private async dbClearData()
     {
         // return this.ready_;
@@ -177,8 +184,7 @@ export class CardDataSetImpl extends EventEmitterImpl<CardEventMap> implements C
                 clearRequest.onerror = reject;
                 clearRequest.onsuccess = () => resolve();
             }))
-            .then(() => tf.io.removeModel(tf_model_store))
-            .catch((reason) => console.warn(reason))
+            .then(() => this.removeModel())
             .then(() => this.dispatchEvent("reset", {}))
             ;
     }

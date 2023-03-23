@@ -50,4 +50,5 @@ export interface CardDataSet extends EventEmitter<CardEventMap>
 
     saveModel(model: tf.LayersModel): Promise<void>
     loadModel(): Promise<tf.LayersModel>
+    removeModel(): Promise<void>
 }

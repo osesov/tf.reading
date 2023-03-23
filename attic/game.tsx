@@ -46,7 +46,7 @@ export class Game extends Component<GameProps, GameState>
     {
         if (this.props.show && !previousProps.show) {
             this.dialogRef.current!.showModal();
-            this.aiSubscription = ai.on('predict', ({index, confidence}) => this.onPredict(index, confidence))
+            this.aiSubscription = ai.on('predict', ({key: index, confidence}) => this.onPredict(index, confidence))
         }
 
         else if (!this.props.show && previousProps.show) {

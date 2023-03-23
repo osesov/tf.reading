@@ -1,14 +1,10 @@
 import tf, { Tensor3D } from "@tensorflow/tfjs";
 import { CardDataSet, CardKey } from "./helpers/cards";
 import { EventEmitterImpl } from "./helpers/EventEmitter";
-import { DataObject } from "./helpers/Types";
+import { hasGetUserMedia } from "./helpers/util";
 
 const MOBILE_NET_INPUT_WIDTH = 224;
 const MOBILE_NET_INPUT_HEIGHT = 224;
-
-export function hasGetUserMedia() {
-    return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-}
 
 function asTensor(tensor: tf.Tensor | tf.Tensor[] | tf.NamedTensorMap): tf.Tensor {
     if (tensor instanceof tf.Tensor)
@@ -17,14 +13,58 @@ function asTensor(tensor: tf.Tensor | tf.Tensor[] | tf.NamedTensorMap): tf.Tenso
     throw new Error("Single tensor expected");
 }
 
-interface AIEventMap
-{
+interface AIEventMap {
     playing: {}
     predict: {
-        index: number,
+        key: number,
         confidence: number
     },
     predicting: {}
+}
+
+class MobilnetLoader {
+    private ready_: Promise<tf.GraphModel>
+    private resolve: (model: tf.GraphModel) => void = (e) => e;
+    private reject: (reason: any) => void = e => e;
+    private loading = false;
+
+    constructor() {
+        this.ready_ = new Promise<tf.GraphModel>((resolve, reject) => {
+            this.resolve = resolve;
+            this.reject = reject;
+        });
+    }
+
+    public get ready() {
+        return this.ready_;
+    }
+
+    public async load(updateStatus: (n: string) => void, warmup: (model: tf.GraphModel) => void): Promise<tf.GraphModel> {
+        if (this.loading)
+            return this.ready_;
+
+        this.loading = true;
+
+        updateStatus("Загрузка данных Mobilenet v3")
+        const URL = "https://tfhub.dev/google/tfjs-model/imagenet/mobilenet_v3_small_100_224/feature_vector/5/default/1";
+
+        tf.loadGraphModel(URL, { fromTFHub: true })
+            // .then( this.resolve )
+            // .catch( this.reject )
+            .then((model) => {
+                warmup(model);
+                this.resolve(model);
+                updateStatus("Данные Mobilenet v3 загружены");
+            })
+
+            .catch((reason) => {
+                this.reject(reason);
+                updateStatus("Ошибка загрузки данных " + String(reason));
+            })
+            ;
+
+        return this.ready_;
+    }
 }
 
 export class AI extends EventEmitterImpl<AIEventMap>
@@ -34,52 +74,49 @@ export class AI extends EventEmitterImpl<AIEventMap>
     private videoGathering = false;
     private trained_ = false;
     private predict = false;
-    private model_ ?: tf.Sequential;
-    private cardDataSet : CardDataSet
-    private mobilenet_: tf.GraphModel | undefined;
+    private model_?: tf.Sequential;
+    private cardDataSet: CardDataSet
+    private mobilenet_: MobilnetLoader;
 
-    public constructor(cardDataSet: CardDataSet)
-    {
+    public constructor(cardDataSet: CardDataSet) {
         super();
         this.cardDataSet = cardDataSet;
 
-        cardDataSet.on( 'reset', () => this.datasetChanged() )
-        cardDataSet.on( 'addCard', () => this.datasetChanged() )
-        cardDataSet.on( 'changeCard', () => this.datasetChanged() )
-        cardDataSet.on( 'deleteCard', () => this.datasetChanged() )
+        cardDataSet.on('reset', () => this.datasetChanged())
+        cardDataSet.on('addCard', () => this.datasetChanged())
+        cardDataSet.on('changeCard', () => this.datasetChanged())
+        cardDataSet.on('deleteCard', () => this.datasetChanged())
 
         cardDataSet.ready
-        .then(() => cardDataSet.loadModel())
-        .then((model) => {
-            this.trained_ = true;
-            this.compileAndSetModel(model as tf.Sequential);
-        }).catch( (reason: any) => {
-            this.trained_ = false;
-            console.warn("Model is not loaded: ", reason);
-        })
+            .then(() => cardDataSet.loadModel())
+            .then((model) => {
+                this.trained_ = true;
+                this.compileAndSetModel(model as tf.Sequential);
+            }).catch((reason: any) => {
+                this.trained_ = false;
+                console.warn("Model is not loaded: ", reason);
+            })
+
+        this.mobilenet_ = new MobilnetLoader();
     }
 
-    public attach(webcam ?: HTMLVideoElement)
-    {
+    public attach(webcam?: HTMLVideoElement) {
         if (this.webcam_ && webcam)
             throw new Error("Cam already attached");
         this.webcam_ = webcam;
     }
 
-    public get webcam(): HTMLVideoElement
-    {
+    public get webcam(): HTMLVideoElement {
         if (!this.webcam_)
             throw Error("Cam is not attached");
         return this.webcam_;
     }
 
-    public get webcamPlaying(): boolean
-    {
+    public get webcamPlaying(): boolean {
         return this.videoPlaying;
     }
 
-    protected haveSubscriber<K extends keyof AIEventMap>(name: K)
-    {
+    protected haveSubscriber<K extends keyof AIEventMap>(name: K) {
         if (name === 'playing' && this.webcamPlaying)
             this.dispatchEvent('playing', {})
     }
@@ -114,8 +151,7 @@ export class AI extends EventEmitterImpl<AIEventMap>
         });
     }
 
-    private compileAndSetModel(model: tf.Sequential)
-    {
+    private compileAndSetModel(model: tf.Sequential) {
         model.summary();
 
         const numberOfClasses = this.numberOfClasses;
@@ -134,8 +170,7 @@ export class AI extends EventEmitterImpl<AIEventMap>
         this.model_ = model;
     }
 
-    private get model(): tf.Sequential
-    {
+    private get model(): tf.Sequential {
         if (this.model_)
             return this.model_;
 
@@ -149,85 +184,84 @@ export class AI extends EventEmitterImpl<AIEventMap>
         return model;
     }
 
-    private datasetChanged()
-    {
+    private datasetChanged() {
         // recreate model on demand
-        this.model_ = undefined;
-        this.trained_ = false;
+        this.discardTraining();
     }
 
-    public get numberOfClasses(): number
-    {
+    public get numberOfClasses(): number {
         return this.cardDataSet.length;
     }
 
-    public get videoPlaying()
-    {
+    public get videoPlaying() {
         return this.videoPlaying_;
     }
 
-    public set videoPlaying(state: boolean)
-    {
+    public set videoPlaying(state: boolean) {
         this.videoPlaying_ = state;
     }
 
-    private get mobilenet() : tf.GraphModel
+    private async discardTraining()
     {
-        if (!this.mobilenet_)
-            throw new Error("Mobilenet is not loaded yet!");
-
-        return this.mobilenet_;
+        this.model_ = undefined;
+        this.trained_ = false;
+        await this.cardDataSet.removeModel()
     }
 
-    private dataGatherLoop(capture: () => void, key: CardKey, data: tf.Tensor[], status: (n: number) => void, done: () => void) {
+    private dataGatherLoop(key: CardKey, data: tf.Tensor[], status: (n: number) => void, done: () => void, mobilenet: tf.GraphModel): boolean
+    {
 
-        if (!this.videoPlaying || !this.mobilenet_) {
-            return;
+        if (!this.videoPlaying) {
+            return false;
         }
 
         if (!this.videoGathering) {
             this.cardDataSet.setTrainingInputs(key, data);
             done();
-            return;
+            return false;
         }
 
         let imageFeatures = tf.tidy(() => {
             let videoFrameAsTensor = tf.browser.fromPixels(this.webcam);
             let resizedTensorFrame = tf.image.resizeBilinear(videoFrameAsTensor, [MOBILE_NET_INPUT_HEIGHT, MOBILE_NET_INPUT_WIDTH], true);
             let normalizedTensorFrame = resizedTensorFrame.div(255);
-            return asTensor(this.mobilenet.predict(normalizedTensorFrame.expandDims())).squeeze();
+            return asTensor(mobilenet.predict(normalizedTensorFrame.expandDims())).squeeze();
         });
 
         data.push(imageFeatures);
 
         status(data.length);
-        window.requestAnimationFrame(capture);
+        return true;
     }
 
-    public beginDataGather(key: CardKey, status: (n: number) => void, done: () => void): void
-    {
+    public beginDataGather(key: CardKey, status: (n: number) => void, done: () => void): void {
         if (!this.videoPlaying)
             throw Error("Video is not playing");
 
+        this.discardTraining();
         this.videoGathering = true;
-        const data : tf.Tensor[] = [];
-        const capture = () => {
-            this.dataGatherLoop(capture, key, data, status, done);
-        }
+        const data: tf.Tensor[] = [];
 
-        capture();
+        this.mobilenet_.ready.then(mobilenet => {
+
+
+            const capture = () => {
+                if (this.dataGatherLoop(key, data, status, done, mobilenet))
+                    window.requestAnimationFrame(capture);
+            }
+
+            capture();
+        })
     }
 
-    public endDataGather()
-    {
+    public endDataGather() {
         if (!this.videoGathering)
             return;
 
         this.videoGathering = false;
     }
 
-    public hasData(key: CardKey): boolean
-    {
+    public hasData(key: CardKey): boolean {
         const card = this.cardDataSet.getCard(key);
 
         return !!card
@@ -237,49 +271,44 @@ export class AI extends EventEmitterImpl<AIEventMap>
             ;
     }
 
-    private predictLoop()
-    {
-        if (!this.predict || !this.mobilenet) {
-            return;
+    private predictLoop(mobilenet: tf.GraphModel): boolean {
+        if (!this.predict) {
+            return false;
         }
-
-        this.dispatchEvent('predicting', {})
-
         tf.tidy(() => {
             let videoFrameAsTensor = tf.browser.fromPixels(this.webcam).div<Tensor3D>(255);
             let resizedTensorFrame = tf.image.resizeBilinear(videoFrameAsTensor, [MOBILE_NET_INPUT_HEIGHT, MOBILE_NET_INPUT_WIDTH], true);
 
-            let imageFeatures = asTensor(this.mobilenet.predict(resizedTensorFrame.expandDims()));
+            let imageFeatures = asTensor(mobilenet.predict(resizedTensorFrame.expandDims()));
             let prediction = asTensor(this.model.predict(imageFeatures)).squeeze();
             let highestIndex = prediction.argMax().arraySync() as number;
             let predictionArray = prediction.arraySync() as number[];
 
             this.dispatchEvent('predict', {
-                index: highestIndex,
+                key: highestIndex,
                 confidence: predictionArray[highestIndex]
             });
         });
 
-        window.requestAnimationFrame(() => this.predictLoop());
+        return true;
     }
 
-    private async train(progress: (fraction: number) => void)
-    {
+    private async train(progress: (fraction: number) => void) {
         if (this.trained_)
             return;
 
         this.trained_ = false;
-        const trainingDataInputs : tf.Tensor[] = [];
+        const trainingDataInputs: tf.Tensor[] = [];
         const trainingDataOutputs: number[] = [];
         const numberOfClasses = this.numberOfClasses;
 
-        this.cardDataSet.forEach( (key, card) => {
+        this.cardDataSet.forEach((key, card) => {
             if (!this.hasData(key)) {
                 throw Error(`Item [${key}] ${card.name} contains not enough data`);
             }
 
             trainingDataInputs.push.apply(trainingDataInputs, card.trainingDataInputs);
-            trainingDataOutputs.push.apply( trainingDataOutputs, Array(card.trainingDataInputs.length).fill(key));
+            trainingDataOutputs.push.apply(trainingDataOutputs, Array(card.trainingDataInputs.length).fill(key));
         })
 
         tf.util.shuffleCombo(trainingDataInputs, trainingDataOutputs);
@@ -296,7 +325,7 @@ export class AI extends EventEmitterImpl<AIEventMap>
             batchSize: 5,
             epochs: epochs,
             callbacks: {
-                onEpochEnd: function(epoch, logs) {
+                onEpochEnd: function (epoch, logs) {
                     progress((epoch + 1) / epochs);
                     // status(`Обучение ${100 * epoch / epochs} %`)
                     console.log("Data for epoch " + epoch, logs);
@@ -317,11 +346,18 @@ export class AI extends EventEmitterImpl<AIEventMap>
 
         this.predict = true;
         // status('Распознавание');
-        this.predictLoop();
+        this.mobilenet_.ready.then( mobilenet => {
+
+            this.dispatchEvent('predicting', {})
+            const capture = () => {
+                if (this.predictLoop(mobilenet))
+                Promise.resolve().then(() => window.requestAnimationFrame(capture));
+            }
+            capture();
+        })
     }
 
-    public reset()
-    {
+    public reset() {
         this.predict = false;
         this.videoGathering = false;
         this.cardDataSet.clear();
@@ -329,23 +365,18 @@ export class AI extends EventEmitterImpl<AIEventMap>
     }
 
     async loadMobileNetFeatureModel(updateStatus: (n: string) => void) {
-        if (this.mobilenet_)
-            return;
-
-        const URL = "https://tfhub.dev/google/tfjs-model/imagenet/mobilenet_v3_small_100_224/feature_vector/5/default/1";
-
-        this.mobilenet_ = await tf.loadGraphModel(URL, { fromTFHub: true });
-        updateStatus("Данные MobileNet v3 загружены!");
-
-        // Warm up the model by passing zeros through it once.
-        tf.tidy(() => {
-            let answer = asTensor(this.mobilenet.predict(tf.zeros([1, MOBILE_NET_INPUT_HEIGHT, MOBILE_NET_INPUT_WIDTH, 3])));
-            console.log(answer.shape);
-        });
+        return this.mobilenet_
+            .load(updateStatus,
+                (mobilenet) => {
+                    // Warm up the model by passing zeros through it once.
+                    tf.tidy(() => {
+                        let answer = asTensor(mobilenet.predict(tf.zeros([1, MOBILE_NET_INPUT_HEIGHT, MOBILE_NET_INPUT_WIDTH, 3])));
+                        console.log(answer.shape);
+                    });
+                })
     }
 
-    public get trained()
-    {
+    public get trained() {
         return this.trained_;
     }
 }

@@ -1,3 +1,23 @@
+html {
+  min-width: 100vw;
+  min-height: 100vh;
+
+  background-image: url('img/bg.jpg');
+  background-position: center center;
+  background-repeat: no-repeat;
+
+  /* -webkit-background-size: cover;
+  -moz-background-size: cover;
+  -o-background-size: cover;*/
+  background-size: cover;
+
+  /* background-size: 100% 100%; */
+  background-color: yellow;
+
+  margin: 0;
+  padding: 0;
+}
+
 body {
   font-family: helvetica, arial, sans-serif;
   margin: 2em;
@@ -78,7 +98,7 @@ clear {
 .word {
   clear: both;
   display: block;
-  padding: 0.5em;
+  padding: 0.2em;
   border: #000000 solid 1px;
   background: white;
   color: brown;
@@ -143,4 +163,50 @@ clear {
   display: flex;
   flex-grow: 1;
   padding: 0em 1em;
+}
+
+div.success {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  justify-content: center;
+  background-color: rgba(164, 215, 148, 0.95);
+}
+
+.position-relative {
+  position: relative;
+}
+
+
+.statistics {
+  height: 32px;
+  width: 100%;
+}
+
+.statistics-item {
+  width: 32px;
+  height: 32px;
+}
+
+.tech-info {
+  position: fixed;
+  /* position: absolute; */
+  border: 2px solid blue;
+  top: 0px;
+  right: 0px;
+  background-color: rgb(228, 255, 251, 70%);
+  padding: 0.5em;
+}
+
+.title {
+  font-size: 3em;
+  font-style: italic;
+  color: #FF6F00;
+  font-weight: bold;
+}
+
+.complete-button {
+  font-size: 2em;
+  color: #FF6F00;
+  font-weight: bold;
 }

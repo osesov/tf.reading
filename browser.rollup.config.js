@@ -25,7 +25,7 @@ export default function (commandLineArgs) {
     const serve = getOpt(commandLineArgs, "serve");
 
     return {
-        input: "src/main.tsx",
+        input: [ "src/main.tsx" ],
         external: ["@tensorflow/tfjs", "jquery"],
         output: {
             file: ".build/rollup/bundle.js",
@@ -87,7 +87,7 @@ function getServePlugin(port) {
             },
         }),
         livereload({
-            watch: ["index", ".build/rollup"],
+            watch: ["src", ".build/rollup"],
             verbose: true, // Disable console output
 
             // other livereload options
