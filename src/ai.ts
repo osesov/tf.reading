@@ -246,8 +246,9 @@ export class AI extends EventEmitterImpl<AIEventMap>
 
 
             const capture = () => {
-                if (this.dataGatherLoop(key, data, status, done, mobilenet))
+                if (this.dataGatherLoop(key, data, status, done, mobilenet)) {
                     window.requestAnimationFrame(capture);
+                }
             }
 
             capture();
@@ -271,6 +272,32 @@ export class AI extends EventEmitterImpl<AIEventMap>
             ;
     }
 
+    private mm: tf.GraphModel | undefined
+    private index: number = 0
+
+    public execute(canvas: HTMLCanvasElement)
+    {
+        const mobilenet = this.mm;
+        if (!mobilenet)
+            return;
+
+        tf.tidy( () => {
+            let videoFrameAsTensor = tf.browser.fromPixels(this.webcam).div<Tensor3D>(255);
+            let resizedTensorFrame = tf.image.resizeBilinear(videoFrameAsTensor, [MOBILE_NET_INPUT_HEIGHT, MOBILE_NET_INPUT_WIDTH], true);
+
+            const names = mobilenet.outputs.map( e => e.name);
+
+            // const names = (mobilenet as any).artifacts.modelTopology.node.map( (e: any) => e.name );
+            const result = mobilenet.execute(resizedTensorFrame.expandDims(), names);
+            const arr = Array.isArray(result) ? result : [result];
+
+            const x = arr[0].dataSync();
+            const o = tf.tensor2d(x, [32,32])
+
+            tf.browser.toPixels(o, canvas);
+        });
+    }
+
     private predictLoop(mobilenet: tf.GraphModel): boolean {
         if (!this.predict) {
             return false;
@@ -288,6 +315,8 @@ export class AI extends EventEmitterImpl<AIEventMap>
                 key: highestIndex,
                 confidence: predictionArray[highestIndex]
             });
+
+            this.mm = mobilenet;
         });
 
         return true;
@@ -350,8 +379,9 @@ export class AI extends EventEmitterImpl<AIEventMap>
 
             this.dispatchEvent('predicting', {})
             const capture = () => {
-                if (this.predictLoop(mobilenet))
-                Promise.resolve().then(() => window.requestAnimationFrame(capture));
+                if (this.predictLoop(mobilenet)) {
+                    Promise.resolve().then(() => window.requestAnimationFrame(capture));
+                }
             }
             capture();
         })

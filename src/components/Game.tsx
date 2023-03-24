@@ -1,4 +1,4 @@
-import { Inputs, useEffect, useState } from "preact/hooks";
+import { Inputs, Ref, useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { ai, cardDataSet } from "../helpers/AIContext";
 import { EWMA } from "../helpers/ewma";
 import { useEventListener } from "../hooks/useEventListener";
@@ -70,7 +70,7 @@ class Filter {
     }
 }
 
-const usePredicting = (smoothingFactor: number, boundary: number, visible: boolean): [PredictState, () => void] => {
+const usePredicting = (smoothingFactor: number, boundary: number, visible: boolean, canvasRef: Ref<HTMLCanvasElement>): [PredictState, () => void] => {
     const emptyPredicting: PredictState = { key: 0, confidence: 0, isConfident: false, deviation: 1, filtered: 0 };
     const [predictValue, setPredicting] = useState<PredictState>(emptyPredicting);
 
@@ -91,18 +91,23 @@ const usePredicting = (smoothingFactor: number, boundary: number, visible: boole
     return [predictValue, resetPredictValue];
 };
 
-const useImage = (requireImage: boolean, inputs: Inputs) => {
+function randomImage(): string
+{
+    const images = ["01.gif", "02.gif", "1C1.gif", "3cvh.gif", "7GdU.gif", "ig4.gif", "Oxyw.gif", "QhT.gif", "Qrbm.gif", "Z92i.gif", "hamster.jpg"];
+    const image = images[Math.floor(Math.random() * images.length)];
+    console.log("use image ", image);
+    return image;
+}
+
+const useImage = (inputs: Inputs) => {
     const images = ["01.gif", "02.gif", "1C1.gif", "3cvh.gif", "7GdU.gif", "ig4.gif", "Oxyw.gif", "QhT.gif", "Qrbm.gif", "Z92i.gif", "hamster.jpg"];
 
     const [currentImage, setCurrentImage] = useState("");
     useEffect(() => {
-        // if (!requireImage) {
-        //     return setCurrentImage("");
-        // }
         const image = images[Math.floor(Math.random() * images.length)];
         console.log("use image ", image);
         setCurrentImage(image);
-    }, [requireImage, ...inputs]);
+    }, inputs);
 
     return [currentImage];
 };
@@ -110,30 +115,19 @@ const useImage = (requireImage: boolean, inputs: Inputs) => {
 const Game = (props: GameProps) => {
     const maxSuccessCount = 5;
 
+    const canvasRef = useRef<HTMLCanvasElement|null>(null);
     const [gameStatus, setGameStatus] = useState<GameStatus>(GameStatus.NOTHING);
     const [currentKey, setCurrentKey] = useState<number | null>(null);
-    const [predictValue, resetPredictValue] = usePredicting(0.1, 0.05, props.show);
+    const [predictValue, resetPredictValue] = usePredicting(0.1, 0.05, props.show, canvasRef);
     const [successCount, setSuccessCount] = useState(0);
+//    const [image] = useImage([props.show, gameStatus === GameStatus.NOTHING]);
+    const [image, setImage] = useState(randomImage);
 
     const waiting = gameStatus === GameStatus.WAITING;
     const success = [GameStatus.SUCCESS, GameStatus.HAPPINESS].includes(gameStatus);
     const thinkMore = gameStatus === GameStatus.WAITING;
     const waitingForKeydown = props.show && [GameStatus.SUCCESS, GameStatus.HAPPINESS, GameStatus.COMPLETE].includes(gameStatus);
 
-    const [image] = useImage(success, [props.show, success]);
-
-    function nextWord() {
-        console.log("Next round");
-        setGameStatus(GameStatus.NOTHING);
-    }
-
-    function nextGame() {
-        setGameStatus(GameStatus.NOTHING);
-        setCurrentKey(null);
-        resetPredictValue();
-        setSuccessCount(0);
-        props.onClose();
-    }
 
     useEventListener(
         waitingForKeydown ? window : null,
@@ -148,6 +142,31 @@ const Game = (props: GameProps) => {
         [props.show, waitingForKeydown]
     );
 
+    useEffect(() => {
+        if (gameStatus === GameStatus.SUCCESS) {
+            setGameStatus(GameStatus.HAPPINESS);
+            // setTimeout(() => setGameStatus(GameStatus.NOTHING), 5000);
+        }
+    }, [gameStatus]);
+
+
+    //// helpers
+    function nextWord() {
+        console.log("Next round");
+        setGameStatus(GameStatus.NOTHING);
+        setImage(randomImage);
+    }
+
+    function nextGame() {
+        setGameStatus(GameStatus.NOTHING);
+        setImage(randomImage);
+        setCurrentKey(null);
+        resetPredictValue();
+        setSuccessCount(0);
+        props.onClose();
+    }
+
+    //// logic
     if (!props.show) return null;
 
     if (gameStatus === GameStatus.COMPLETE) {
@@ -170,13 +189,6 @@ const Game = (props: GameProps) => {
         throw new Error("No word!");
 
     const s = GameStatus[gameStatus];
-
-    useEffect(() => {
-        if (gameStatus === GameStatus.SUCCESS) {
-            setGameStatus(GameStatus.HAPPINESS);
-            // setTimeout(() => setGameStatus(GameStatus.NOTHING), 5000);
-        }
-    }, [gameStatus]);
 
     if (gameStatus === GameStatus.WAITING && predictValue.isConfident) {
         if (currentKey === predictValue.key) {
@@ -230,6 +242,7 @@ const Game = (props: GameProps) => {
                 {s}
             </div>
             <button onClick={() => nextWord()}>Пропустить</button>
+            <canvas style="display:none" ref={canvasRef} width="300" height="300"></canvas>
         </div>
     );
 };

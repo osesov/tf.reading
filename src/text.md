@@ -34,4 +34,3 @@ https://www.youtube.com/watch?v=UXB9bFj-UA4
 - star: https://www.template.net/editable/75063/transparent-star-clipart
 - success: https://gifer.com/ru/
 - back: https://7oom.ru/powerpoint/detskiy-fon-dlya-prezentacii.html
--
