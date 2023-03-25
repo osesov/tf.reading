@@ -4,8 +4,8 @@
 // debug code (useful for production sites)
 // import "preact/devtools";
 
-import { createRef, RefCallback, RefObject, render } from "preact";
-import { useCallback, useContext, useEffect, useState } from "preact/hooks";
+import { createRef, render } from "preact";
+import { useEffect, useState } from "preact/hooks";
 
 // https://www.npmjs.com/package/html-native-modal
 import MyButton from "./components/MyButton";
@@ -22,8 +22,8 @@ import "./style.css"
 async function seedDatabase()
 {
     const data = [
-        // "январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"
-        "Фон", "Телефон", "Пульт"
+        "январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"
+        // "Фон", "Телефон", "Пульт"
     ]
 
     await cardDataSet.clear();

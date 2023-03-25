@@ -5,6 +5,7 @@ import commonjs from "@rollup/plugin-commonjs";
 import serve from "rollup-plugin-serve";
 import livereload from "rollup-plugin-livereload";
 import css from "rollup-plugin-import-css";
+import copy from "rollup-plugin-copy";
 
 dotenv.config();
 
@@ -47,6 +48,11 @@ export default function (commandLineArgs) {
             css(),
             resolve(),
             commonjs(),
+            copy({
+                targets: [
+                    { src: 'src/index.html', dest: '.build/rollup/'}
+                ]
+            }),
             ...getServePlugin(serve),
         ],
         watch: {

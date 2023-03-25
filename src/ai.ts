@@ -244,7 +244,6 @@ export class AI extends EventEmitterImpl<AIEventMap>
 
         this.mobilenet_.ready.then(mobilenet => {
 
-
             const capture = () => {
                 if (this.dataGatherLoop(key, data, status, done, mobilenet)) {
                     window.requestAnimationFrame(capture);
