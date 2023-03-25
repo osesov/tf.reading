@@ -1,4 +1,4 @@
-import tf, { Tensor3D } from "@tensorflow/tfjs";
+import tf from "@tensorflow/tfjs";
 import { CardDataSet, CardKey } from "./helpers/cards";
 import { EventEmitterImpl } from "./helpers/EventEmitter";
 import { hasGetUserMedia } from "./helpers/util";
@@ -282,7 +282,7 @@ export class AI extends EventEmitterImpl<AIEventMap>
             return;
 
         tf.tidy( () => {
-            let videoFrameAsTensor = tf.browser.fromPixels(this.webcam).div<Tensor3D>(255);
+            let videoFrameAsTensor = tf.browser.fromPixels(this.webcam).div<tf.Tensor3D>(255);
             let resizedTensorFrame = tf.image.resizeBilinear(videoFrameAsTensor, [MOBILE_NET_INPUT_HEIGHT, MOBILE_NET_INPUT_WIDTH], true);
 
             const names = mobilenet.outputs.map( e => e.name);
@@ -303,7 +303,7 @@ export class AI extends EventEmitterImpl<AIEventMap>
             return false;
         }
         tf.tidy(() => {
-            let videoFrameAsTensor = tf.browser.fromPixels(this.webcam).div<Tensor3D>(255);
+            let videoFrameAsTensor = tf.browser.fromPixels(this.webcam).div<tf.Tensor3D>(255);
             let resizedTensorFrame = tf.image.resizeBilinear(videoFrameAsTensor, [MOBILE_NET_INPUT_HEIGHT, MOBILE_NET_INPUT_WIDTH], true);
 
             let imageFeatures = asTensor(mobilenet.predict(resizedTensorFrame.expandDims()));

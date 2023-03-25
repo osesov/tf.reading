@@ -1,0 +1,39 @@
+<html>
+
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js" type="text/javascript"></script>
+</head>
+<script>
+// данные для обучения
+function getData()
+{
+    const input = Array(10).fill(0).map( (_, x) => x)
+    const output = input.map( x => 2 * x - 1 )
+    return [
+        tf.tensor2d(input, [input.length, 1]),
+        tf.tensor2d(output, [output.length, 1])
+    ];
+}
+
+// создание модели
+const model = tf.sequential();
+
+model.add(tf.layers.inputLayer({ inputShape: [1] }))
+model.add(tf.layers.dense({ units: 25, activation: 'relu' }));
+model.add(tf.layers.dense({ units: 1, activation: 'linear' }));
+
+model.compile({
+    loss: tf.losses.meanSquaredError,
+    optimizer: tf.train.adam(),
+});
+
+// тренировка модели
+const [input, output] = getData();
+model.fit(input, output, { epochs: 5000, }).then( async () => {
+    // использование модели
+    const x = tf.tensor2d([2.5], [1,1]);
+    const y = await model.predict(x, [1,1]).array()[0];
+    console.log(y)
+})
+</script>
+</html>

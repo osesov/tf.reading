@@ -195,9 +195,9 @@ const App = () => {
                     <ShowCardList ref={editCardsRef} show={cardListVisible} onClose={() => closeCardList() } />
                     <button {...visibleIfNotPlaying()} onClick={ () => enableCam()} {... enableCamProps()}>Включить Камеру</button>
                     <button {...visibleIfNotPlaying()} onClick={ () => showCardList() }>Карточки</button>
-                    <button {...visibleIfNotPlaying()} onClick={ () => clearData() }>Сброс данных</button>
                     <button {...visibleIfNotPlaying()} onClick={ () => beginGame() }>Поехали!</button>
-                    <button {...visibleIfNotPlaying()} onClick={ () => seedData() }>Добавить карточки из набора</button>
+                    {/* <button {...visibleIfNotPlaying()} onClick={ () => clearData() }>Сброс данных</button> */}
+                    {/* <button {...visibleIfNotPlaying()} onClick={ () => seedData() }>Добавить карточки из набора</button> */}
                 </div>
                 <div class="layout-horizontal-center">
                     <ProgressBar bgcolor={"#6a1b9a"} completed={progress} visible={training} />
