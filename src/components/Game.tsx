@@ -99,6 +99,14 @@ function randomImage(): string
     return image;
 }
 
+function randomSound(): string
+{
+    const files = ["Sound_06013800 1662662948.mp3"];
+    const file = files[Math.floor(Math.random() * files.length)];
+    console.log("use sound ", file);
+    return file;
+}
+
 const useImage = (inputs: Inputs) => {
     const images = ["01.gif", "02.gif", "1C1.gif", "3cvh.gif", "7GdU.gif", "ig4.gif", "Oxyw.gif", "QhT.gif", "Qrbm.gif", "Z92i.gif", "hamster.jpg"];
 
@@ -122,6 +130,7 @@ const Game = (props: GameProps) => {
     const [successCount, setSuccessCount] = useState(0);
 //    const [image] = useImage([props.show, gameStatus === GameStatus.NOTHING]);
     const [image, setImage] = useState(randomImage);
+    const [sound, setSound] = useState(randomSound);
 
     const waiting = gameStatus === GameStatus.WAITING;
     const success = [GameStatus.SUCCESS, GameStatus.HAPPINESS].includes(gameStatus);
@@ -155,11 +164,13 @@ const Game = (props: GameProps) => {
         console.log("Next round");
         setGameStatus(GameStatus.NOTHING);
         setImage(randomImage);
+        setSound(randomSound);
     }
 
     function nextGame() {
         setGameStatus(GameStatus.NOTHING);
         setImage(randomImage);
+        setSound(randomSound);
         setCurrentKey(null);
         resetPredictValue();
         setSuccessCount(0);
@@ -203,14 +214,13 @@ const Game = (props: GameProps) => {
 
     if (success) {
         const imageUri = "img/success/" + image;
+        const soundUri = "sound/" + sound;
         const next = () => nextWord();
-
-        // console.log("IMAGE:", imageUri);
-        // useKeypress(next, [props.show, gameStatus]);
 
         return (
             <div class="success layout-vertical layout-vertical-center">
                 <img src={imageUri}></img>
+                <audio autoPlay={true} src={soundUri}></audio>
                 <button onClick={next} autoFocus={true}>
                     Жми!
                 </button>
